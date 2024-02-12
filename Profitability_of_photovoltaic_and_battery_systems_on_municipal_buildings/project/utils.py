@@ -37,6 +37,7 @@ def get_SCR_SSR(df: pd.DataFrame,
                 charge_efficiency: int, 
                 discharge_efficiency: int
                ) -> list[int]:
+    """Function to calculate Self Consumption Rate (SCR) and Self Suffiency Rate"""
     df['SCR'] = df['E_PV'] - df['E_feedin'] - (1-charge_efficiency) * df['E_charge'] - (1-(1/discharge_efficiency)) * df['E_discharge']
 
     SCR = (df['SCR'].sum()/df['E_PV'].sum())*100
