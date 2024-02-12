@@ -11,6 +11,7 @@ data = pd.read_csv(data_dir)
 hour_in_year = [*range(len(data))]
 
 ''' FIRST OBJECTIVE FUNCTION '''
+#LP model is implemented here
 def mincost(data):
     model = pyo.ConcreteModel()
 
