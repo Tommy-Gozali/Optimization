@@ -10,9 +10,14 @@ from project.utils  import *
 data = pd.read_csv(data_dir)
 hour_in_year = [*range(len(data))]
 
+z1 = "min electricity procurement cost"
+z2 = "min electricity procurement cost and peak power feed-in"
+
+objectives = [z1, z2]
+
 ''' FIRST OBJECTIVE FUNCTION '''
 #LP model is implemented here
-def mincost(data):
+def mincost(data, objective: str):
     model = pyo.ConcreteModel()
 
     model.i = pyo.RangeSet(0, len(data)-1)
@@ -27,6 +32,7 @@ def mincost(data):
     model.pv_feedin_max    = pyo.Var(model.i, domain=pyo.NonNegativeReals, bounds = (0.0, pv_max_power))
 
     model.objective1       = pyo.Var(model.i,domain=pyo.NonNegativeReals)
+    model.objective2       = pyo.Var(model.i,domain=pyo.NonNegativeReals)
 
     def SOC_rule(model, i): #SOC constraints
         if i == 0:
@@ -52,6 +58,9 @@ def mincost(data):
     def objective1_rule(model,i):
         return model.objective1[i] == model.E_supply[i]*p_supply - model.E_feedin[i]*p_fit
         
+    def objective2_rule(model, i):
+        return model.objective2[i] == Lambda * ((model.E_supply[i]*p_supply - model.E_feedin[i]*p_fit)/ohm) + (1-Lambda) * (pv_max_power/PV_cap)
+                          
     def only_charge_surplus_rule(model, i):
         return model.charge[i] * (data["Energy Demand (kWh)"].iloc[i] - data['Energy PV (kWh)'].iloc[i]) <= 0
     
@@ -67,19 +76,34 @@ def mincost(data):
     model.only_charge_surplus_rule   = pyo.Constraint(model.i, rule = only_charge_surplus_rule)
     model.only_discharge_demand_rule = pyo.Constraint(model.i, rule = only_discharge_demand_rule)
     model.objective1_rule            = pyo.Constraint(model.i, rule = objective1_rule)
+    model.objective2_rule            = pyo.Constraint(model.i, rule = objective2_rule)
 
-    def objective_rule(model):
+    def objective_rule_one(model):
         return pyo.summation(model.objective1)    # first obj function
+    
+    def objective_rule_two(model):
+        return pyo.summation(model.objective2)    # second obj function
+    
+    if objective == "min electricity procurement cost":
+        model.obj = pyo.Objective(rule = objective_rule_one, sense=pyo.minimize)
 
-    model.obj = pyo.Objective(rule = objective_rule, sense=pyo.minimize)
-
+    elif objective == "min electricity procurement cost and peak power feed-in": 
+        model.obj = pyo.Objective(rule = objective_rule_two, sense=pyo.minimize)
+        
     opt = SolverFactory("glpk")
-
     opt.solve(model)
+    
     return model
 
-model_result = mincost(data)
+model_result_objective_one, model_result_objective_two = mincost(data, objective=z1), mincost(data, objective=z2)
 
-df_result = get_results_as_df(model_result, hour_in_year, data)
+model_results = [model_result_objective_one, model_result_objective_two]
 
-SCR, SSR  = get_SCR_SSR(df = df_result, charge_efficiency= charging_efficiency, discharge_efficiency=discharging_efficiency)
+df_results    = [get_results_as_df(result, hour_in_year, data) for result in model_results]
+
+SSR_SCR = []
+for n in range(len(objectives)):
+    SSR_SCR.append(get_SCR_SSR(df = df_results[n], 
+                               charge_efficiency = charging_efficiency, discharge_efficiency = discharging_efficiency, 
+                               objective = objectives[n]))
+    

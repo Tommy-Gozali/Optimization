@@ -35,7 +35,8 @@ def get_results_as_df(model_result,
 
 def get_SCR_SSR(df: pd.DataFrame, 
                 charge_efficiency: int, 
-                discharge_efficiency: int
+                discharge_efficiency: int,
+                objective: str
                ) -> list[int]:
     """Function to calculate Self Consumption Rate (SCR) and Self Suffiency Rate"""
     df['SCR'] = df['E_PV'] - df['E_feedin'] - (1-charge_efficiency) * df['E_charge'] - (1-(1/discharge_efficiency)) * df['E_discharge']
@@ -43,7 +44,7 @@ def get_SCR_SSR(df: pd.DataFrame,
     SCR = (df['SCR'].sum()/df['E_PV'].sum())*100
     SSR = (df['SCR'].sum()/df['E_demand'].sum())*100
 
-    print('SCR (First Objective Function) =',SCR,'%')
-    print('SSR (First Objective Function) =',SSR,'%')
+    print(f'SCR with obj.function: {objective} = {SCR}%')
+    print(f'SSR with obj.function: {objective} = {SSR}%')
     
     return SCR, SSR
